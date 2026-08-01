@@ -138,7 +138,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
           <p className="text-sm text-blue-800">
             <strong>Note:</strong> This is a template cover letter generated
             based on your CV. Please customize it further to match the specific
-            job requirements and company you're applying to.
+            job requirements and company you&apos;re applying to.
           </p>
         </div>
       </div>

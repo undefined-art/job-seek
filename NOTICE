@@ -1,0 +1,25 @@
+# Notice
+
+This software is provided under the MIT License. See the `LICENSE` file for
+the full license text.
+
+## Trademarks
+
+Ollama is a trademark of its respective owners. This project is not
+affiliated with, endorsed by, or sponsored by Ollama. Use of the name
+"Ollama" is for identification purposes only.
+
+## Third-Party Notices
+
+This project includes or depends on third-party software:
+
+- **Go** (`golang.org/x/*`, standard library) - BSD-style license
+- **Gin** (`github.com/gin-gonic/gin`) - MIT License
+- **Gin CORS** (`github.com/gin-contrib/cors`) - MIT License
+- **go-pdf** (`github.com/ledongthuc/pdf`) - MIT License
+- **Next.js** - MIT License
+- **React** - MIT License
+- **lucide-react** - ISC License
+- **Tailwind CSS** - MIT License
+
+See the respective project licenses for details.

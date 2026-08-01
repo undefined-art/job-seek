@@ -60,30 +60,61 @@ A lightweight, privacy-focused application for CV analysis and cover letter gene
 
 ## Docker Deployment
 
-### Development with Docker
+### Production
 
 ```bash
-# Start all services
-docker-compose up --build
+# Build and start all services
+docker-compose up --build -d
 
 # View logs
 docker-compose logs -f
+
+# Check service health
+docker-compose ps
 
 # Stop services
 docker-compose down
 ```
 
-### Production Deployment
+The Compose file waits for Ollama and the backend to become healthy before
+starting downstream services. The frontend image bakes the API URL at build
+time via the `NEXT_PUBLIC_API_URL` build argument (defaults to
+`http://localhost:8080`, which is reachable from the browser because the
+backend publishes port 8080 to the host).
+
+### Local Development (without Docker)
+
+1. Install Ollama and pull the model (see below).
+2. Start the backend:
+
+   ```bash
+   cd backend
+   go mod tidy
+   go run main.go
+   ```
+
+3. Start the frontend (in a new terminal):
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+4. Open http://localhost:3000
+
+## Running Tests
 
 ```bash
-# Build and start in detached mode
-docker-compose up --build -d
+# Backend (Go)
+cd backend
+go test ./...
 
-# Check service health
-docker-compose ps
-
-# View logs
-docker-compose logs -f
+# Frontend (Next.js)
+cd frontend
+npm run type-check
+npm run lint
+npm run build
 ```
 
 ## API Endpoints
@@ -104,6 +135,14 @@ curl -X POST -F "text=Your CV content here..." http://localhost:8080/api/analyze
 ## Configuration
 
 ### Environment Variables
+
+| Variable            | Default                    | Description                                     |
+| ------------------- | -------------------------- | ----------------------------------------------- |
+| `PORT`              | `8080`                     | Backend listen port                             |
+| `OLLAMA_URL`        | `http://localhost:11434`   | Ollama server base URL                          |
+| `MODEL_NAME`        | `llama3.2:3b`              | Ollama model used for analysis                  |
+| `CORS_ORIGIN`       | `http://localhost:3000`    | Comma-separated allowed frontend origins        |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8080`  | Backend URL used by the browser                 |
 
 Copy `env.example` to `.env` and modify as needed:
 

@@ -18,6 +18,8 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
+// CVAnalysisResponse is the JSON payload returned to the client after an
+// Ollama-backed CV analysis.
 type CVAnalysisResponse struct {
 	Score          int      `json:"score"`
 	Suggestions    []string `json:"suggestions"`
@@ -25,12 +27,14 @@ type CVAnalysisResponse struct {
 	ProcessingTime string   `json:"processingTime"`
 }
 
+// OllamaRequest is the request body sent to the Ollama API.
 type OllamaRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
 	Stream bool   `json:"stream"`
 }
 
+// OllamaResponse is the response body received from the Ollama API.
 type OllamaResponse struct {
 	Response string `json:"response"`
 	Done     bool   `json:"done"`
@@ -38,16 +42,39 @@ type OllamaResponse struct {
 }
 
 const (
-	OLLAMA_URL    = "http://localhost:11434"
-	MODEL_NAME    = "llama3.2:3b"
-	MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+	defaultOllamaURL = "http://localhost:11434"
+	defaultModelName = "llama3.2:3b"
+	// maxFileSize caps the size of an uploaded CV document.
+	maxFileSize = 10 * 1024 * 1024 // 10MB
+	// maxRequestBodySize caps the total size of a multipart request.
+	maxRequestBodySize = 11 * 1024 * 1024
+	// ollamaTimeout guards against a hung Ollama process.
+	ollamaTimeout = 60 * time.Second
 )
 
-func main() {
+var (
+	ollamaURL  = getEnv("OLLAMA_URL", defaultOllamaURL)
+	modelName  = getEnv("MODEL_NAME", defaultModelName)
+	httpClient = &http.Client{Timeout: ollamaTimeout}
+)
+
+// getEnv returns the value of the named environment variable, or fallback if
+// the variable is empty.
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+// newRouter builds the Gin engine and registers all routes. Keeping this
+// separate from main() makes the application testable.
+func newRouter() *gin.Engine {
 	r := gin.Default()
 
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000"}
+	allowedOrigins := strings.Split(getEnv("CORS_ORIGIN", "http://localhost:3000"), ",")
+	config.AllowOrigins = allowedOrigins
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	r.Use(cors.New(config))
@@ -64,23 +91,31 @@ func main() {
 			"status":           status,
 			"timestamp":        time.Now(),
 			"ollama_available": ollamaHealthy,
-			"model":            MODEL_NAME,
+			"model":            modelName,
 		})
 	})
 
 	r.POST("/api/analyze", analyzeCV)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	return r
+}
+
+func main() {
+	port := getEnv("PORT", "8080")
 
 	log.Printf("Server starting on port %s", port)
-	log.Fatal(r.Run(":" + port))
+	log.Printf("Ollama URL: %s | Model: %s", ollamaURL, modelName)
+
+	r := newRouter()
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("failed to start server: %v", err)
+	}
 }
 
 func analyzeCV(c *gin.Context) {
 	startTime := time.Now()
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRequestBodySize)
 	textInput := c.PostForm("text")
 
 	var extractedText string
@@ -89,7 +124,7 @@ func analyzeCV(c *gin.Context) {
 	if err == nil {
 		defer file.Close()
 
-		if header.Size > MAX_FILE_SIZE {
+		if header.Size > maxFileSize {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "File too large. Maximum size is 10MB."})
 			return
 		}
@@ -116,8 +151,7 @@ func analyzeCV(c *gin.Context) {
 		return
 	}
 
-	processingTime := time.Since(startTime).String()
-	analysis.ProcessingTime = processingTime
+	analysis.ProcessingTime = time.Since(startTime).String()
 
 	c.JSON(http.StatusOK, analysis)
 }
@@ -200,7 +234,7 @@ Focus on:
 - Industry-specific requirements`, cvText)
 
 	reqBody := OllamaRequest{
-		Model:  MODEL_NAME,
+		Model:  modelName,
 		Prompt: prompt,
 		Stream: false,
 	}
@@ -211,9 +245,9 @@ Focus on:
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	resp, err := http.Post(OLLAMA_URL+"/api/generate", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := httpClient.Post(ollamaURL+"/api/generate", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Ollama: %v. Please ensure Ollama is running and the model '%s' is installed", err, MODEL_NAME)
+		return nil, fmt.Errorf("failed to connect to Ollama: %v. Please ensure Ollama is running and the model '%s' is installed", err, modelName)
 	}
 	defer resp.Body.Close()
 
@@ -248,7 +282,6 @@ Focus on:
 	err = json.Unmarshal([]byte(cleanedResponse), &analysis)
 
 	if err != nil {
-
 		log.Printf("Failed to parse JSON from Ollama. Raw response: %s", ollamaResp.Response)
 		log.Printf("Cleaned response: %s", cleanedResponse)
 
@@ -267,7 +300,7 @@ Focus on:
 }
 
 func checkOllamaHealth() bool {
-	resp, err := http.Get(OLLAMA_URL + "/api/tags")
+	resp, err := httpClient.Get(ollamaURL + "/api/tags")
 	if err != nil {
 		return false
 	}

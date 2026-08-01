@@ -1,0 +1,5 @@
+.git
+*.log
+main
+job-seek-backend
+*.test

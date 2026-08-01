@@ -1,13 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
+  output: 'standalone',
   images: {
     domains: [],
   },
-  // Optimize for performance
-  swcMinify: true,
   compress: true,
   poweredByHeader: false,
   // Security headers
@@ -26,7 +22,7 @@ const nextConfig = {
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin',
+            value: 'strict-origin-when-cross-origin',
           },
         ],
       },

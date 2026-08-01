@@ -52,3 +52,10 @@ temp/
 *.test
 *.out
 go.work
+
+# Compiled Go binaries
+/backend/main
+/backend/job-seek-backend
+
+# TypeScript incremental build info
+*.tsbuildinfo
